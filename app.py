@@ -4,9 +4,14 @@
 # request: to access incoming request data (e.g., POST data)
 # abort: to handle errors and send error status codes
 from flask import Flask, jsonify, request, abort
+from flask_cors import CORS  # Enable Cross-Origin Resource Sharing for client apps
 
 # Initialize the Flask app
 app = Flask(__name__)
+
+# Enable CORS so the HTML client can connect from a browser
+# This allows requests from different origins (e.g., file:// or another port)
+CORS(app)
 
 # In-memory "database" of users
 # This list holds a set of user dictionaries. 

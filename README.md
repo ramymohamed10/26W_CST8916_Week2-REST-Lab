@@ -95,11 +95,11 @@ curl -X DELETE https://jsonplaceholder.typicode.com/posts/1
 
 Each tool has its own strengths. Here's a quick guide:
 
-| Tool            | Best For | Pros | Cons |
-|-----------------|----------|------|------|
-| **curl**        | Quick testing in the terminal | Fast, works everywhere, good for automation in shell scripts | Harder to read/write for complex requests |
-| **REST Client** | Learning & manual testing inside VS Code | Easy to use, readable request files, nice formatted responses | Only works inside VS Code |
-| **Code (Python/JS/etc.)** | Building real applications | Can reuse data in programs, automate workflows, connect APIs | Requires coding knowledge, more setup |
+| Tool                      | Best For                                 | Pros                                                          | Cons                                      |
+| ------------------------- | ---------------------------------------- | ------------------------------------------------------------- | ----------------------------------------- |
+| **curl**                  | Quick testing in the terminal            | Fast, works everywhere, good for automation in shell scripts  | Harder to read/write for complex requests |
+| **REST Client**           | Learning & manual testing inside VS Code | Easy to use, readable request files, nice formatted responses | Only works inside VS Code                 |
+| **Code (Python/JS/etc.)** | Building real applications               | Can reuse data in programs, automate workflows, connect APIs  | Requires coding knowledge, more setup     |
 
 Think of it like this:
 - **curl** → Quick, command-line experiments
@@ -132,9 +132,10 @@ Before you can run or deploy this app, you need to have the following installed:
 
 ## Project Structure
 
-- app.py: Main Flask application 
-- requirements.txt: List of Python dependencies 
+- app.py: Main Flask application
+- requirements.txt: List of Python dependencies
 - test-api.http: Test the REST API using the REST Client extension in Visual Studio Code
+- client.html: Browser-based client to interact with the API (Part 3)
 - README.md: Documentation
 
 ## Running Locally
@@ -275,9 +276,158 @@ Browser → http://localhost:8000/             Browser → https://yourapp.azure
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
+---
+
+## Part 3: HTML/JavaScript Client
+
+This section introduces a browser-based client that consumes the Flask REST API using JavaScript's `fetch()` API. This completes the full picture: you see both sides of REST communication, the server (Flask) and the client (browser).
+
+### What is the fetch() API?
+
+`fetch()` is JavaScript's built-in way to make HTTP requests, it's like `curl`, but for web browsers.
+
+Think of it this way:
+| Tool      | Where it runs        | Example                                |
+| --------- | -------------------- | -------------------------------------- |
+| `curl`    | Terminal             | `curl http://localhost:8000/users`     |
+| `fetch()` | Browser (JavaScript) | `fetch('http://localhost:8000/users')` |
+
+Both do the same thing: send an HTTP request and get a response.
+
+**Example — GET all users:**
+```javascript
+// Send a GET request to the API
+fetch('http://localhost:8000/users')
+    .then(response => response.json())  // Convert response to JSON
+    .then(data => console.log(data));   // Do something with the data
+```
+
+**Example — POST a new user:**
+```javascript
+// Send a POST request with data
+fetch('http://localhost:8000/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'Charlie', age: 28 })
+})
+    .then(response => response.json())
+    .then(data => console.log(data));
+```
+
+The `.then()` parts handle the response when it arrives (since network requests take time).
+
+### What is CORS?
+
+**CORS (Cross-Origin Resource Sharing)** is a browser security feature that prevents websites from making requests to other websites without permission.
+
+By default, web browsers are paranoid. They block websites from talking to each other to keep you safe. CORS is the specific mechanism that allows them to talk safely.
+
+![CORS Explained](cors-explained.png)
+
+*Left: Without CORS, the browser (security guard) blocks your website from accessing another server. Right: With CORS enabled, the server says "this website is on my allowed list" and the browser lets the request through.*
+
+**Why does this matter?**
+
+Imagine you open `client.html` on your computer. The browser sees two different "addresses":
+- The HTML file: `file:///C:/projects/client.html` (your computer)
+- The API: `http://localhost:8000` (the Flask server)
+
+These are **different origins** (different addresses). By default, browsers block this for security reasons — they don't want random websites stealing data from other sites.
+
+**The problem:**
+```
+Browser: "Hey API, give me the users list"
+API: "Here you go!"
+Browser: "Wait... you're from a different origin. BLOCKED!"
+```
+
+**The solution:**
+
+The API needs to say "It's okay, I allow requests from other origins." We do this by adding `flask-cors` to our Flask app:
+
+```python
+from flask_cors import CORS
+CORS(app)  # Tell browsers: "Allow requests from anywhere"
+```
+
+Now the browser allows the request because the API explicitly permits it.
+
+### Running the Client
+
+#### Local Development
+
+1. Make sure the Flask API is running:
+   ```bash
+   python app.py
+   ```
+
+2. Open `client.html` in your browser:
+   - Double-click the file, OR
+   - Use VS Code's Live Server extension, OR
+   - Open directly: `file:///path/to/client.html`
+
+3. The API URL should be `http://localhost:8000` (default)
+
+4. Click **"Check Health"** to verify the connection, then **"Refresh Users"** to load data
+
+#### With Azure Deployment
+
+1. Deploy your Flask API to Azure App Service (see Part 2)
+
+2. Open `client.html` in your browser
+
+3. Change the API Base URL to your Azure URL:
+   ```
+   https://<your-app-name>.azurewebsites.net
+   ```
+
+4. Click **"Check Health"** to verify the connection
+
+### Client Features
+
+| Feature      | HTTP Method | Endpoint      | Description                  |
+| ------------ | ----------- | ------------- | ---------------------------- |
+| Health Check | GET         | `/health`     | Verify API is running        |
+| List Users   | GET         | `/users`      | Display all users in a table |
+| Create User  | POST        | `/users`      | Add a new user via form      |
+| Edit User    | PUT         | `/users/<id>` | Update existing user         |
+| Delete User  | DELETE      | `/users/<id>` | Remove a user                |
+
+The client also displays the **raw HTTP request and response** for each operation, helping you understand what happens "under the hood."
+
+### Architecture with Client
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      Complete REST Architecture                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────┐         HTTP Request          ┌─────────────────┐  │
+│  │                     │  ───────────────────────────► │                 │  │
+│  │   client.html       │    GET /users                 │   Flask API     │  │
+│  │   (Browser)         │    POST /users                │   (app.py)      │  │
+│  │                     │    PUT /users/1               │                 │  │
+│  │   JavaScript        │    DELETE /users/1            │   Port 8000     │  │
+│  │   fetch() API       │  ◄─────────────────────────── │                 │  │
+│  │                     │         JSON Response         │                 │  │
+│  └─────────────────────┘                               └─────────────────┘  │
+│                                                                             │
+│  The browser enforces CORS policy:                                          │
+│  • Same origin → allowed                                                    │
+│  • Different origin → blocked unless server sends CORS headers              │
+│  • flask-cors adds: Access-Control-Allow-Origin: *                          │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Local:  client.html (file://) ──► http://localhost:8000                    │
+│  Azure:  client.html (file://) ──► https://yourapp.azurewebsites.net        │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Homework (Self-Study)
 
-To better understand how a REST API is built with Flask, go through the source code in **app.py** and complete the following:
+To better understand how a REST API is built with Flask, go through the source code in **`app.py`** and complete the following:
 
 1. **Trace the Code**
    - Identify where the Flask app is created.
